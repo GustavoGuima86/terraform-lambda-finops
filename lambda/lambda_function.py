@@ -1142,9 +1142,37 @@ def get_savings_plans_coverage():
                 'Start': six_months_ago.strftime('%Y-%m-%d'),
                 'End': today.strftime('%Y-%m-%d')
             },
-            Granularity='MONTHLY'
+            Granularity='MONTHLY',
+            GroupBy=[{'Type': 'DIMENSION', 'Key': 'SERVICE'}]
         )
-        return response['SavingsPlansCoverages']
+        
+        consolidated_coverage = {}
+        for item in response['SavingsPlansCoverages']:
+            service = item['Attributes']['SERVICE']
+            if service not in consolidated_coverage:
+                consolidated_coverage[service] = {
+                    'SpendCoveredBySavingsPlans': 0,
+                    'OnDemandCost': 0,
+                    'TotalCost': 0,
+                }
+            
+            consolidated_coverage[service]['SpendCoveredBySavingsPlans'] += float(item['Coverage']['SpendCoveredBySavingsPlans'])
+            consolidated_coverage[service]['OnDemandCost'] += float(item['Coverage']['OnDemandCost'])
+            consolidated_coverage[service]['TotalCost'] += float(item['Coverage']['TotalCost'])
+
+        for service, data in consolidated_coverage.items():
+            total_cost = data['TotalCost']
+            if total_cost > 0:
+                data['CoveragePercentage'] = f"{(data['SpendCoveredBySavingsPlans'] / total_cost) * 100:.2f}%"
+            else:
+                data['CoveragePercentage'] = "0.00%"
+            
+            data['SpendCoveredBySavingsPlans'] = f"{data['SpendCoveredBySavingsPlans']:.2f}"
+            data['OnDemandCost'] = f"{data['OnDemandCost']:.2f}"
+            data['TotalCost'] = f"{data['TotalCost']:.2f}"
+
+        return [{'Service': key, **value} for key, value in consolidated_coverage.items()]
+
     except ce_client.exceptions.DataUnavailableException:
         print("Savings plans coverage data is not available.")
         return []
@@ -1162,7 +1190,34 @@ def get_savings_plans_utilization():
             },
             Granularity='MONTHLY'
         )
-        return response['SavingsPlansUtilizationsByTime']
+        
+        consolidated_utilization = {}
+        for item in response['SavingsPlansUtilizationsByTime']:
+            service = "Aggregated" # The API does not group by service, so we aggregate all
+            if service not in consolidated_utilization:
+                consolidated_utilization[service] = {
+                    'TotalCommitment': 0,
+                    'UsedCommitment': 0,
+                    'UnusedCommitment': 0,
+                }
+            
+            consolidated_utilization[service]['TotalCommitment'] += float(item['Total']['TotalCommitment'])
+            consolidated_utilization[service]['UsedCommitment'] += float(item['Total']['UsedCommitment'])
+            consolidated_utilization[service]['UnusedCommitment'] += float(item['Total']['UnusedCommitment'])
+
+        for service, data in consolidated_utilization.items():
+            total_commitment = data['TotalCommitment']
+            if total_commitment > 0:
+                data['UtilizationPercentage'] = f"{(data['UsedCommitment'] / total_commitment) * 100:.2f}%"
+            else:
+                data['UtilizationPercentage'] = "0.00%"
+            
+            data['TotalCommitment'] = f"{data['TotalCommitment']:.2f}"
+            data['UsedCommitment'] = f"{data['UsedCommitment']:.2f}"
+            data['UnusedCommitment'] = f"{data['UnusedCommitment']:.2f}"
+
+        return [{'Service': key, **value} for key, value in consolidated_utilization.items()]
+
     except ce_client.exceptions.DataUnavailableException:
         print("Savings plans utilization data is not available.")
         return []
