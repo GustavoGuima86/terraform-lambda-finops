@@ -3,6 +3,16 @@ import boto3
 import json
 from datetime import datetime, timedelta
 
+def format_bytes(size_in_bytes):
+    if size_in_bytes < 1024:
+        return f"{size_in_bytes} Bytes"
+    elif size_in_bytes < 1024**2:
+        return f"{size_in_bytes/1024:.2f} KB"
+    elif size_in_bytes < 1024**3:
+        return f"{size_in_bytes/1024**2:.2f} MB"
+    else:
+        return f"{size_in_bytes/1024**3:.2f} GB"
+
 def get_reservation_utilization():
     ce_client = boto3.client('ce')
     today = datetime.now()
@@ -60,13 +70,13 @@ def get_cost_and_usage():
                         'average_cost': 0
                     }
                 
-                services_data[service_name]['monthly_expenses'][month] = cost
+                services_data[service_name]['monthly_expenses'][month] = f"{cost:.2f}"
             
     for service_name, data in services_data.items():
-        total_cost = sum(data['monthly_expenses'].values())
+        total_cost = sum(float(c) for c in data['monthly_expenses'].values())
         average_cost = total_cost / len(data['monthly_expenses']) if data['monthly_expenses'] else 0
-        services_data[service_name]['total_cost'] = total_cost
-        services_data[service_name]['average_cost'] = average_cost
+        services_data[service_name]['total_cost'] = f"{total_cost:.2f}"
+        services_data[service_name]['average_cost'] = f"{average_cost:.2f}"
         
     return services_data
 
@@ -172,11 +182,11 @@ def get_ebs_volumes():
         volumes.append({
             'VolumeId': volume['VolumeId'],
             'VolumeType': volume['VolumeType'],
-            'Size': volume['Size'],
+            'SizeGB': volume['Size'],
             'InUse': in_use,
             'Iops': volume.get('Iops', 'N/A'),
             'Throughput': volume.get('Throughput', 'N/A'),
-            'CreateTime': volume['CreateTime'].isoformat()
+            'CreateTime': volume['CreateTime'].strftime('%d/%m/%Y')
         })
         
     return volumes
@@ -220,9 +230,9 @@ def get_ebs_snapshots():
         snapshots.append({
             'SnapshotId': snapshot['SnapshotId'],
             'VolumeId': volume_id,
-            'SnapshotSize': snapshot['VolumeSize'],
-            'VolumeSize': volume_size,
-            'StartTime': snapshot['StartTime'].isoformat(),
+            'SnapshotSizeGB': snapshot['VolumeSize'],
+            'VolumeSizeGB': volume_size,
+            'StartTime': snapshot['StartTime'].strftime('%d/%m/%Y'),
             'LifecyclePolicy': lifecycle_policy
         })
         
@@ -276,7 +286,7 @@ def get_s3_data():
                         if 'Days' in rule['Expiration']:
                             rule_description += f", Expires after {rule['Expiration']['Days']} days"
                         elif 'Date' in rule['Expiration']:
-                            rule_description += f", Expires on {rule['Expiration']['Date'].isoformat()}"
+                            rule_description += f", Expires on {rule['Expiration']['Date'].strftime('%d/%m/%Y')}"
                     if 'Transitions' in rule:
                         for transition in rule['Transitions']:
                             rule_description += f", Transitions to {transition['StorageClass']} after {transition['Days']} days"
@@ -549,7 +559,7 @@ def get_rds_data():
             snapshots_response = rds_client.describe_db_snapshots(DBInstanceIdentifier=db_instance_id)
             snapshots = [{
                 'SnapshotId': s['DBSnapshotIdentifier'],
-                'SnapshotCreateTime': s['SnapshotCreateTime'].isoformat(),
+                'SnapshotCreateTime': s['SnapshotCreateTime'].strftime('%d/%m/%Y'),
                 'Encrypted': s['Encrypted']
             } for s in snapshots_response['DBSnapshots']]
 
@@ -617,19 +627,19 @@ def get_dynamodb_data():
             backups_response = dynamodb_client.list_backups(TableName=table_name)
             backups = [{
                 'BackupArn': b['BackupArn'],
-                'BackupCreationDateTime': b['BackupCreationDateTime'].isoformat(),
+                'BackupCreationDateTime': b['BackupCreationDateTime'].strftime('%d/%m/%Y'),
                 'BackupStatus': b['BackupStatus']
             } for b in backups_response['BackupSummaries']]
 
             provisioned_throughput = table_info.get('ProvisionedThroughput')
             if provisioned_throughput and 'LastIncreaseDateTime' in provisioned_throughput:
-                provisioned_throughput['LastIncreaseDateTime'] = provisioned_throughput['LastIncreaseDateTime'].isoformat()
+                provisioned_throughput['LastIncreaseDateTime'] = provisioned_throughput['LastIncreaseDateTime'].strftime('%d/%m/%Y')
             if provisioned_throughput and 'LastDecreaseDateTime' in provisioned_throughput:
-                provisioned_throughput['LastDecreaseDateTime'] = provisioned_throughput['LastDecreaseDateTime'].isoformat()
+                provisioned_throughput['LastDecreaseDateTime'] = provisioned_throughput['LastDecreaseDateTime'].strftime('%d/%m/%Y')
 
             tables_data.append({
                 'TableName': table_name,
-                'TableSizeBytes': table_info['TableSizeBytes'],
+                'TableSize': format_bytes(table_info['TableSizeBytes']),
                 'ItemCount': table_info['ItemCount'],
                 'ProvisionedThroughput': provisioned_throughput or 'On-demand',
                 'AverageConsumedReadCapacity': avg_read_capacity,
@@ -687,11 +697,11 @@ def get_elasticache_data():
             snapshots_response = elasticache_client.describe_snapshots(CacheClusterId=cluster_id)
             snapshots = [{
                 **s,
-                'CacheClusterCreateTime': s['CacheClusterCreateTime'].isoformat(),
+                'CacheClusterCreateTime': s['CacheClusterCreateTime'].strftime('%d/%m/%Y'),
                 'NodeSnapshots': [{
                     **ns,
-                    'CacheNodeCreateTime': ns['CacheNodeCreateTime'].isoformat(),
-                    'SnapshotCreateTime': ns['SnapshotCreateTime'].isoformat()
+                    'CacheNodeCreateTime': ns['CacheNodeCreateTime'].strftime('%d/%m/%Y'),
+                    'SnapshotCreateTime': ns['SnapshotCreateTime'].strftime('%d/%m/%Y')
                 } for ns in s.get('NodeSnapshots', [])]
             } for s in snapshots_response['Snapshots']]
 
@@ -733,7 +743,7 @@ def get_efs_data():
         efs_data.append({
             'FileSystemId': fs_id,
             'Name': fs.get('Name', 'N/A'),
-            'SizeInBytes': fs['SizeInBytes']['Value'],
+            'Size': format_bytes(fs['SizeInBytes']['Value']),
             'ThroughputMode': fs['ThroughputMode'],
             'ProvisionedThroughputInMibps': fs.get('ProvisionedThroughputInMibps'),
             'LifecyclePolicies': lifecycle_policies,
@@ -786,7 +796,7 @@ def get_cloudwatch_logs_data():
         for log_group in page['logGroups']:
             log_groups_data.append({
                 'LogGroupName': log_group['logGroupName'],
-                'StoredBytes': log_group['storedBytes'],
+                'Stored': format_bytes(log_group['storedBytes']),
                 'RetentionInDays': log_group.get('retentionInDays', 'Never Expires')
             })
             
