@@ -8,6 +8,7 @@ The Lambda function collects data from the following AWS services:
 
 -   **AWS Cost Explorer:**
     -   Reservation utilization over the last six months.
+    -   Savings Plans coverage and utilization over the last six months.
     -   Monthly cost and usage data, filtered for services with costs exceeding $10.
 -   **Amazon EC2:**
     -   List of running instances with their descriptions and average CPU utilization.
@@ -51,43 +52,62 @@ The Lambda function collects data from the following AWS services:
 -   **Amazon CloudFront:**
     -   Details of CloudFront distributions, including cache behaviors and usage metrics.
 
-## Deployment
+## Report Structure
 
-This project uses Terraform to manage and deploy the necessary AWS infrastructure.
+The `report.json` file will have the following structure:
 
-### Prerequisites
-
--   [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) installed.
--   AWS credentials configured for Terraform.
-
-### Steps
-
-1.  **Initialize Terraform:**
-    Open a terminal in the project's root directory and run:
-    ```bash
-    terraform init
-    ```
-
-2.  **Deploy the Infrastructure:**
-    Apply the Terraform configuration to deploy the Lambda function and related resources:
-    ```bash
-    terraform apply
-    ```
-    Terraform will show you a plan of the resources to be created. Type `yes` to confirm.
-
-3.  **Access the Report:**
-    Once the deployment is complete, the Lambda function will be invoked, and the FinOps report will be saved as `report.json` in the root directory.
-
-### Updating the Lambda Function
-
-If you make changes to the `lambda/lambda_function.py` file, you'll need to redeploy the function:
-
-1.  **Create a new zip file:**
-    ```bash
-    zip -j lambda.zip lambda/lambda_function.py
-    ```
-
-2.  **Redeploy with Terraform:**
-    ```bash
-    terraform apply
-    ```
+```json
+{
+  "cost_and_usage": {
+    "Amazon Elastic Compute Cloud - Compute": {
+      "monthly_expenses": {
+        "2025/05": 150.75
+      },
+      "total_cost": 150.75,
+      "average_cost": 150.75
+    }
+  },
+  "savings": {
+    "reservation_utilization": [],
+    "savings_plans_coverage": [],
+    "savings_plans_utilization": []
+  },
+  "computing": {
+    "ec2_instances": [
+      {
+        "InstanceId": "i-0123456789abcdef0",
+        "Description": "My EC2 Instance",
+        "AverageCPUUtilization": "10.50%"
+      }
+    ],
+    "eks_data": [],
+    "lambda_functions": [],
+    "elasticsearch_data": []
+  },
+  "storage": {
+    "ebs_volumes": [],
+    "ebs_snapshots": [],
+    "s3_data": [],
+    "efs_data": []
+  },
+  "databases": {
+    "rds_data": [],
+    "dynamodb_data": [],
+    "elasticache_data": []
+  },
+  "networking": {
+    "network_topology": [],
+    "lost_nat_gateways": [],
+    "unused_eips": [],
+    "data_transfer_costs": [],
+    "cloudfront_data": [],
+    "load_balancers": []
+  },
+  "others": {
+    "cloudwatch_logs": [],
+    "kinesis_data": [],
+    "sqs_data": [],
+    "sns_data": []
+  }
+}
+```

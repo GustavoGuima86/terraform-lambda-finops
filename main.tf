@@ -1,4 +1,3 @@
-
 provider "aws" {
   region = var.aws_region
 }
@@ -30,6 +29,8 @@ resource "aws_iam_policy" "lambda_policy" {
         Action   = [
           "ce:GetCostAndUsage",
           "ce:GetReservationUtilization",
+          "ce:GetSavingsPlansCoverage",
+          "ce:GetSavingsPlansUtilization",
           "cloudwatch:GetMetricData",
           "cloudwatch:GetMetricStatistics",
           "cloudwatch:ListMetrics",
@@ -125,24 +126,4 @@ resource "aws_lambda_function" "finops_lambda" {
       LOG_LEVEL = "INFO"
     }
   }
-}
-
-resource "aws_cloudwatch_event_rule" "daily_trigger" {
-  name                = "daily_finops_lambda_trigger"
-  description         = "Trigger FinOps Lambda daily"
-  schedule_expression = "rate(1 day)"
-}
-
-resource "aws_cloudwatch_event_target" "lambda_target" {
-  rule      = aws_cloudwatch_event_rule.daily_trigger.name
-  target_id = "finops_lambda"
-  arn       = aws_lambda_function.finops_lambda.arn
-}
-
-resource "aws_lambda_permission" "allow_cloudwatch" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.finops_lambda.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.daily_trigger.arn
 }

@@ -8,15 +8,18 @@ def get_reservation_utilization():
     today = datetime.now()
     six_months_ago = today - timedelta(days=180)
     
-    response = ce_client.get_reservation_utilization(
-        TimePeriod={
-            'Start': six_months_ago.strftime('%Y-%m-%d'),
-            'End': today.strftime('%Y-%m-%d')
-        },
-        Granularity='MONTHLY'
-    )
-    
-    return response['UtilizationsByTime']
+    try:
+        response = ce_client.get_reservation_utilization(
+            TimePeriod={
+                'Start': six_months_ago.strftime('%Y-%m-%d'),
+                'End': today.strftime('%Y-%m-%d')
+            },
+            Granularity='MONTHLY'
+        )
+        return response['UtilizationsByTime']
+    except ce_client.exceptions.DataUnavailableException:
+        print("Reservation utilization data is not available.")
+        return []
 
 def get_cost_and_usage():
     ce_client = boto3.client('ce')
@@ -1118,8 +1121,47 @@ def get_cloudfront_data():
 
 
 
+def get_savings_plans_coverage():
+    ce_client = boto3.client('ce')
+    today = datetime.now()
+    six_months_ago = today - timedelta(days=180)
+    
+    try:
+        response = ce_client.get_savings_plans_coverage(
+            TimePeriod={
+                'Start': six_months_ago.strftime('%Y-%m-%d'),
+                'End': today.strftime('%Y-%m-%d')
+            },
+            Granularity='MONTHLY'
+        )
+        return response['SavingsPlansCoverages']
+    except ce_client.exceptions.DataUnavailableException:
+        print("Savings plans coverage data is not available.")
+        return []
+
+def get_savings_plans_utilization():
+    ce_client = boto3.client('ce')
+    today = datetime.now()
+    six_months_ago = today - timedelta(days=180)
+    
+    try:
+        response = ce_client.get_savings_plans_utilization(
+            TimePeriod={
+                'Start': six_months_ago.strftime('%Y-%m-%d'),
+                'End': today.strftime('%Y-%m-%d')
+            },
+            Granularity='MONTHLY'
+        )
+        return response['SavingsPlansUtilizationsByTime']
+    except ce_client.exceptions.DataUnavailableException:
+        print("Savings plans utilization data is not available.")
+        return []
+
+
 def lambda_handler(event, context):
     reservation_utilization = get_reservation_utilization()
+    savings_plans_coverage = get_savings_plans_coverage()
+    savings_plans_utilization = get_savings_plans_utilization()
     cost_and_usage = get_cost_and_usage()
     running_instances = get_running_ec2_instances()
     
@@ -1153,32 +1195,43 @@ def lambda_handler(event, context):
     cloudfront_data = get_cloudfront_data()
     
     finops_data = {
-        'reservation_utilization': reservation_utilization,
         'cost_and_usage': cost_and_usage,
-        'ec2_instances': ec2_instances_data,
-        'ebs_volumes': ebs_volumes,
-        'ebs_snapshots': ebs_snapshots,
-        's3_data': s3_data,
-        'network_topology': network_topology_data['VpcData'],
-        'lost_nat_gateways': network_topology_data['LostNatGateways'],
-        'eks_data': eks_data,
-        'rds_data': rds_data,
-        'dynamodb_data': dynamodb_data,
-        'elasticache_data': elasticache_data,
-        'efs_data': efs_data,
-        'load_balancers': load_balancers_data,
-        'cloudwatch_logs': cloudwatch_logs_data,
-        'lambda_functions': lambda_functions_data,
-        'elasticsearch_data': elasticsearch_data,
-        'kinesis_data': kinesis_data,
-        'sqs_data': sqs_data,
-        'sns_data': sns_data,
-        'unused_eips': unused_eips_data,
-        'data_transfer_costs': data_transfer_costs,
-        'cloudfront_data': cloudfront_data
+        'savings':{
+            'reservation_utilization': reservation_utilization,
+            'savings_plans_coverage': savings_plans_coverage,
+            'savings_plans_utilization': savings_plans_utilization,
+        },
+        'computing':{
+            'ec2_instances': ec2_instances_data,
+            'eks_data': eks_data,
+            'lambda_functions': lambda_functions_data,
+            'elasticsearch_data': elasticsearch_data,
+        },
+        'storage':{
+            'ebs_volumes': ebs_volumes,
+            'ebs_snapshots': ebs_snapshots,
+            's3_data': s3_data,
+            'efs_data': efs_data,
+        },
+        'databases':{
+            'rds_data': rds_data,
+            'dynamodb_data': dynamodb_data,
+            'elasticache_data': elasticache_data,
+        },
+        'networking':{
+            'network_topology': network_topology_data['VpcData'],
+            'lost_nat_gateways': network_topology_data['LostNatGateways'],
+            'unused_eips': unused_eips_data,
+            'data_transfer_costs': data_transfer_costs,
+            'cloudfront_data': cloudfront_data,
+            'load_balancers': load_balancers_data,
+        },
+        'others':{
+            'cloudwatch_logs': cloudwatch_logs_data,
+            'kinesis_data': kinesis_data,
+            'sqs_data': sqs_data,
+            'sns_data': sns_data,
+        }
     }
-    
-    # print(json.dumps(finops_data, indent=4, default=str))
-
     
     return finops_data
