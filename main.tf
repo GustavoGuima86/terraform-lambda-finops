@@ -31,6 +31,10 @@ resource "aws_iam_policy" "lambda_policy" {
           "ce:GetReservationUtilization",
           "ce:GetSavingsPlansCoverage",
           "ce:GetSavingsPlansUtilization",
+          "config:DescribeConfigRules",
+          "config:DescribeConformancePacks",
+          "config:DescribeConfigurationRecorders",
+          "config:DescribeConfigurationRecorderStatus",
           "cloudwatch:GetMetricData",
           "cloudwatch:GetMetricStatistics",
           "cloudwatch:ListMetrics",
@@ -48,6 +52,7 @@ resource "aws_iam_policy" "lambda_policy" {
           "ec2:DescribeTransitGateways",
           "ec2:DescribeVolumes",
           "ec2:DescribeVpcs",
+          "ec2:DescribeRegions",
           "elasticfilesystem:DescribeFileSystems",
           "efs:DescribeBackupPolicy",
           "efs:DescribeMountTargets",
@@ -115,7 +120,7 @@ resource "aws_lambda_function" "finops_lambda" {
   function_name = "finops_data_collector"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.9"
+  runtime       = "python3.13"
   filename      = data.archive_file.lambda_zip.output_path
   timeout = 300
   memory_size = 1024
